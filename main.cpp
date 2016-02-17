@@ -10,9 +10,29 @@
 #include "adc.h"
 #include "gray_oled.h"
 #include "temperature.h"
+#include "event_gpio.h"
 
 
 #define I2C_BUS		"/dev/i2c-1"
+#define GPIO_PIR    2
+#define GPIO_BUZZER 60
+
+
+void pir_callback(unsigned int gpio)
+{
+    static int fOn = 0;
+    if(fOn)
+    {
+        gpio_set_value(GPIO_BUZZER, 0);
+        fOn = 0;
+    }
+    else
+    {
+        gpio_set_value(GPIO_BUZZER, 1);
+        fOn = 1;
+    }
+}
+
 
 int main(void)
 {
@@ -24,7 +44,14 @@ int main(void)
         perror("Error opening i2c bus");
         return 1;
     }
+    /* set up motion sensor - buzzer */
+    add_edge_callback(GPIO_PIR, pir_callback);
+    gpio_set_direction(GPIO_PIR, INPUT);
+    add_edge_detect(GPIO_PIR, BOTH_EDGE);
+    gpio_export(GPIO_BUZZER);
+    gpio_set_direction(GPIO_BUZZER, OUTPUT);
 
+    /* set up temperature sensor and OLED */
     temperature_init(fd, TI_HIGHEST_LOWEST);
     SeeedGrayOled.init(fd);
     SeeedGrayOled.clearDisplay();
@@ -48,8 +75,7 @@ int main(void)
         SeeedGrayOled.setTextXY(2, 4);
         snprintf(oled_text, sizeof(oled_text), "H: %d \xb0" "C", temperature);
         SeeedGrayOled.putString(oled_text);
-        sleep(10);
-        SeeedGrayOled.setInverseDisplay();
+        sleep(1);
     }
 }
 
